@@ -71,15 +71,7 @@ So first of all we need to find the likehood function for a binomial distributio
 
 ## Estimation
 
-Usually is more convenient to work with the derivative of $log[(L(x; \theta)]$, note that the maximum point of $L(x; \theta)$ and $log[L(x; \theta)]$ is the same point. Since we are looking at the maximum point then we know that $L'(x; \theta) = 0$, so:
-
-\begin{align*}
-  log'[L(x; \theta)] =& \frac{\partial log[L(x; \theta)]}{\partial \theta}  \\
-  =& \frac{1}{L(x; \theta)} \frac{\partial L(x; \theta)}{\partial \theta}; \quad \text{but we know that in the maximum point} \frac{\partial L(x; \theta)}{\partial \theta} = 0 \\
-  \Rightarrow \frac{\partial log[L(x; \theta)]}{\partial \theta} =& 0 
-\end{align*}
-
-$\forall x_0 \quad$That $f(x_0; \theta) \neq 0$.
+Usually is more convenient to work with the derivative of $log[(L(x; \theta)]$, note that the maximum point of $L(x; \theta)$ and $log[L(x; \theta)]$ is the same point.
 
 \begin{align*}
   L(x; \theta) =& \prod_{i = 1}^n f(x_i; \theta) \\
