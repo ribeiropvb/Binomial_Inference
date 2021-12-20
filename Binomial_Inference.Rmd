@@ -105,7 +105,7 @@ Newton-Raphson method is an interactive that start with a initial guess of the r
 
 In this document we will not explain the thery behind the method, but the image bellow is a pretty good way to have a hint on how it works. Basically, given a start point (first guess), is calculated the derivative, so is found the point the the tangent line "touch" the x-axis, then is calculated his image on y-axis and the the derivative on the point, and so on. Until in one time the difference on the two point is lower than the tolerance accepted for the user.
 
-```{r, include = T}
+```{r, include = T, fig.align = 'center'}
 image_read('https://predictivehacks.com/wp-content/uploads/2020/08/newtonRaphsonMethod.png')
 ```
 
