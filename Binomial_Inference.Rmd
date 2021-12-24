@@ -492,7 +492,7 @@ tab3 <- param_n3[,2] %>%
     coverage = c('error','hit')
   )
 tab <- bind_cols(tab1,tab2$n,tab3$n) %>% 
-  magrittr::set_colnames(c('coverage','p_0.75','p_0.5','p_0.15'))
+  magrittr::set_colnames(c('coverage','p_0.15','p_0.5','p_0.75'))
 ```
 
 ```{r, include = T}
@@ -501,6 +501,7 @@ tab %>%
   kable_styling(latex_options = c("hold_position",'striped'))
 ```
 
+So we since the coverage for all values of p, we can say that the estimator defined is the equation \ref{lhn} is a good estimator.
 
 ## Both n and p unknow
 
