@@ -11,7 +11,9 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(magrittr)
 library(magick)
+library(kableExtra)
 knitr::opts_chunk$set(
   echo = F
   , include = F
@@ -22,6 +24,7 @@ knitr::opts_chunk$set(
 set.seed(18122021)
 data <- rbinom(275, 17, 0.75)
 
+k <- 100
 m <- length(data)
 media <- mean(data)
 ```
@@ -84,16 +87,16 @@ Usually is more convenient to work with the derivative of $log[(L(x; \theta)]$, 
 
 Supposing that the parameter n is know, in order to estimate the parameter p we can derivate $l(x; \theta)$ in relation to p. We have:
 
-\begin{align*}
-  \frac{\partial l(x; \theta)}{\partial p} =& \frac{\partial}{\partial p}\Big{[} \sum_{i = 1}^m log \Big{[} \binom{n}{x_i} \Big{]} + m\bar{X}log(p) + (mn - m\bar{X})log(1 - p) \Big{]} \\
-  \Rightarrow& \frac{m\bar{X}}{\hat{p}} - \frac{n - \bar{X}}{1 - \hat{p}} =& 0
-\end{align*}
+\begin{align}
+  \frac{\partial l(x; \theta)}{\partial p} =& \frac{\partial}{\partial p}\Big{[} \sum_{i = 1}^m log \Big{[} \binom{n}{x_i} \Big{]} + m\bar{X}log(p) + (mn - m\bar{X})log(1 - p) \Big{]} \nonumber \\
+  \Rightarrow& \frac{\bar{X}}{\hat{p}} - \frac{n - \bar{X}}{1 - \hat{p}} = 0 \label{p_hat}
+\end{align}
 
 There's no explict formular for the estimator of p, so we need to use some computation way to find the maximum root of the derivative of $l(x; \theta)$. A very good way of doing it is know as the Newton-Raphoson Method, there're mode way to solve the problem, such as the secant method, Bisection method or even finding the maximum point of the likehood function (which will be done in the last section). In this document we will use the Newton-Raphson method.
 
 ## Newton-Raphson method
 
-Newton-Raphson method is an interactive that start with a initial guess of the root. The Newton-Raphson method is an approch to find the roots of non-linear equations, is a well-known and widely used for his simplicity and his speed for convergency.
+Newton-Raphson method is an interactive equation that start with a initial guess of the root. The Newton-Raphson method is an approch to find the roots of non-linear equations, is a well-known and widely used for his simplicity and his speed for convergency.
 
 In this document we will not explain the thery behind the method, but the image bellow is a pretty good way to have a hint on how it works. Basically, given a start point (first guess), is calculated the derivative, so is found the point the the tangent line "touch" the x-axis, then is calculated his image on y-axis and the the derivative on the point, and so on. Until in one time the difference on the two point is lower than the tolerance accepted for the user.
 
@@ -102,7 +105,7 @@ image_read('https://predictivehacks.com/wp-content/uploads/2020/08/newtonRaphson
 ```
 
 \begin{equation}
-  x_{n + 1} = x_n - \frac{f(x_n)}{f'(x_n)}
+  x_{n + 1} = x_n - \frac{f(x_n)}{f'(x_n)} \label{nr}
 \end{equation}
 
 The code used to find the root using the Newton-Raphson method were made by Aaron Schlegel on the \href{https://rpubs.com/aaronsc32/newton-raphson-method}{LINK}, as it follows:
@@ -134,7 +137,7 @@ newton.raphson <- function(f, a, b, tol = 1e-5, n = 1000) {
     # Once the difference between x0 and x1 becomes sufficiently small, output the results.
     if (abs(x1 - x0) < tol) {
       root.approx <- tail(k, n=1)
-      res <- list('root approximation' = root.approx, 'iterations' = k)
+      res <- list('root_approximation' = root.approx, 'iterations' = k)
       return(res)
     }
     # If Newton-Raphson has not yet reached convergence set x1 as x0 and continue
@@ -143,6 +146,8 @@ newton.raphson <- function(f, a, b, tol = 1e-5, n = 1000) {
   print('Too many iterations in method')
 }
 ```
+
+So let the parameter as previously defined (n = 17, p = 0.75), we will define the function \ref{p_hat} on hat and run the newton raphson method as shown in the equation \ref{nr}.
 
 ```{r}
 # Estimar p => n Conhecido
@@ -153,33 +158,103 @@ frp <- function(x) 1/print(x)*media - (n - media)/(1-x)
 p_hat <- newton.raphson(frp, 0.001, 1) %>% 
   quiet()
 p_hat
+```
 
-# param_p <- matrix(NA, ncol = 2, nrow = 10000)
-# for (i in 1:10000) {
-#   set.seed(18122021-i)
-#   data <- rbinom(275, 17, 0.75)
-# 
-#   m <- length(data)
-#   media <- mean(data)
-# 
-#   val <- newton.raphson(frp, 0.001, 1) %>% 
-#   quiet() %>% 
-#     .$`root approximation`
-#   param_p[i,] <- cbind(i, val)
-# }
-# 
-# param_p[,2] %>%
-#   round(4) %>%
-#   as_tibble() %>%
-#   mutate(ID = 1:length(value)) %>%
-#   ggplot(aes(x = ID, y = value))+
-#   geom_point()+
-#   geom_hline(yintercept = 0.75, color = 'red')+
-#   theme_classic()
+So for the seed `18122021` we had a estimation on the p-value `r p_hat$root_approximation` and the root converged with `r length(p_hat$iterations)`, such that the tolerance was of 0.00001.
+
+To confirm the efficiency of the estimator we will use a Monte-Carlo simulation, which basically means, that we will the code a bunch of times and see the estimator behavior. In this case we will run the code 10,000 times, and for we have the same result.
+
+```{r}
+param_p <- matrix(NA, ncol = 2, nrow = k); interact <- NA
+for (i in 1:k) {
+  set.seed(23122021-i)
+  data <- rbinom(275, 17, 0.75)
+
+  m <- length(data)
+  media <- mean(data)
+
+  val <- newton.raphson(frp, 0.001, 1) %>%
+  quiet()
+  interact[i] <- length(val$iterations)
+  param_p[i,] <- cbind(i, val$root_approximation)
+}
 ```
 
 
+
+```{r, include = T}
+upp_lim <- mean(param_p[, 2]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(param_p[, 2])
+low_lim <- mean(param_p[, 2]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(param_p[, 2])
+
+param_p[,2] %>%
+  round(4) %>%
+  as_tibble() %>%
+  mutate(ID = 1:length(value)) %>%
+  ggplot(aes(x = ID, y = value))+
+  geom_point()+
+  geom_hline(yintercept = 0.75, color = 'red', size = 1.5)+
+  geom_hline(
+    yintercept = low_lim
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  geom_hline(
+    yintercept = upp_lim
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  theme_classic()
+```
+
+From the plot above we can see that the estimations in highly concentrated inside the interval of confidence (blue line). To check the coverage of the estimation, we can see the percentage of points that is inside the interval and the value have to be greater than or equal to the confidence chosen ($\gamma$ = 0.95).
+
+let's call "hit" the points that are within the confidence interval and "error" the ones that aren't.
+
+```{r, include = T}
+param_p[,2] %>%
+  round(4) %>%
+  as_tibble() %>% 
+  mutate(
+    coverage = between(value, low_lim, upp_lim) %>% as.numeric()
+  ) %$% table(coverage) %>% 
+  prop.table() %>% 
+  as_tibble() %>% 
+  mutate(
+    coverage = c('error','hit')
+  ) %>%
+  knitr::kable(booktabs = T) %>% 
+  kable_styling(latex_options = c("hold_position",'striped'))
+```
+
+So, since the value is equal to 0.952, which is greater than the chosen $\gamma$, then the estimator have a good covarage, and the value converges quickly, with only 13 or 14 interactions (12.34\% and 87.66\%, respectively). So we have a great estimator
+
 ## Estimate n, with p know
+
+Now we will use the same theory to find the estimative for n, called $\hat{n}$, so first of all we will open the binomial on the log of the likelihood function:
+
+\begin{align}
+  l(x; \theta) =& \sum_{i = 1}^n log \Big{[} \frac{n!}{(n - x_i)! x_i!} \Big{]} + n\bar{X}log(p) + (mn - m\bar{X})log(1 - p) \nonumber \\
+  =& \sum_{i = 1}^n log(n!) - \sum_{i = 1}^n log[(n - x_i)!] - \sum_{i = 1}^n log(x_i!) + n\bar{X}log(p) + (mn - m\bar{X})log(1 - p) \label{lh_n}
+\end{align}
+
+One thing that we have to note is that "n" is a discrete number, therefore the function \ref{lh_n} doesn't have a derivative on respect to n, but we have a very interesting function that can help to solve this problem, that function is the gamma function.
+
+\begin{equation}
+  \Gamma(t) = \int_{0}^{\infty} x^{t - 1}e^{-x} dx \label{gamma}
+\end{equation}
+
+The gamma function have a very interesting propriety:
+
+- $\Gamma(n) = (n - 1)! \quad \Rightarrow \quad n! = \Gamma(n + 1)$.
+
+Which is a continuous function. So making the substitution of the equation \ref{gamma} in the equation \ref{lh_n}, and defining that the derivative of $log[\Gamma(n)]$ in relation to n is equal to $\psi^{(0)}(n)$.
+
+\begin{align*}
+  l(x; \theta) =& \sum_{i = 1}^n log(n!) - \sum_{i = 1}^n log[(n - x_i)!] - \sum_{i = 1}^n log(x_i!) + n\bar{X}log(p) + (mn - m\bar{X})log(1 - p) \\
+  \frac{\partial l(x ; \theta)}{\partial n} = m\psi^{(0)}(n + 1) - \sum_{i = 1} \psi^{(0)}(n - x_i + 1) + mlog(1 - p)
+\end{align*}
 
 ```{r}
 # Estimar n => p Conhecido
@@ -194,7 +269,7 @@ frn <- function(x) m*psigamma((x+1),0) - sum(psigamma((x - data + 1))) + m*log(1
 
 n_hat <- newton.raphson(frn,max(data),100) %>% 
   quiet()
-n_hat$`root approximation`
+n_hat$root_approximation
 ```
 
 
