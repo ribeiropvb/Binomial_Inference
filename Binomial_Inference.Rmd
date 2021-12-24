@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 set.seed(18122021)
 data <- rbinom(275, 17, 0.75)
 
-k <- 100
+k <- 10000
 m <- length(data)
 media <- mean(data)
 ```
@@ -253,8 +253,14 @@ Which is a continuous function. So making the substitution of the equation \ref{
 
 \begin{align*}
   l(x; \theta) =& \sum_{i = 1}^n log(n!) - \sum_{i = 1}^n log[(n - x_i)!] - \sum_{i = 1}^n log(x_i!) + n\bar{X}log(p) + (mn - m\bar{X})log(1 - p) \\
-  \frac{\partial l(x ; \theta)}{\partial n} = m\psi^{(0)}(n + 1) - \sum_{i = 1} \psi^{(0)}(n - x_i + 1) + mlog(1 - p)
+  \frac{\partial l(x ; \theta)}{\partial n} =& m\psi^{(0)}(n + 1) - \sum_{i = 1} \psi^{(0)}(n - x_i + 1) + mlog(1 - p)
 \end{align*}
+
+Then the maximum likelihood for n doesn't have a closed equation, similar to p. So we have the function.
+
+\begin{equation}
+  m\psi^{(0)}(\hat{n} + 1) - \sum_{i = 1} \psi^{(0)}(\hat{n} - x_i + 1) + mlog(1 - p) = 0
+\end{equation}
 
 ```{r}
 # Estimar n => p Conhecido
