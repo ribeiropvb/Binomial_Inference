@@ -7,6 +7,8 @@ header-includes:
    - \usepackage{amssymb}
    - \usepackage{bm}
 output: pdf_document
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -14,6 +16,7 @@ library(tidyverse)
 library(magrittr)
 library(magick)
 library(kableExtra)
+library(patchwork)
 knitr::opts_chunk$set(
   echo = F
   , include = F
@@ -83,7 +86,7 @@ Usually is more convenient to work with the derivative of $log[(L(x; \theta)]$, 
   =& \sum_{i = 1}^m log \Big{[} \binom{n}{x_i} \Big{]} + m\bar{X}log(p) + (mn - m\bar{X})log(1 - p)
 \end{align*}
 
-## Estimate p, with n known
+# Estimate p, with n known
 
 Supposing that the parameter n is know, in order to estimate the parameter p we can derivate $l(x; \theta)$ in relation to p. We have:
 
@@ -230,7 +233,7 @@ param_p[,2] %>%
 
 So, since the value is equal to 0.952, which is greater than the chosen $\gamma$, then the estimator have a good covarage, and the value converges quickly, with only 13 or 14 interactions (12.34\% and 87.66\%, respectively). So we have a great estimator
 
-## Estimate n, with p know
+# Estimate n, with p know
 
 Now we will use the same theory to find the estimative for n, called $\hat{n}$, so first of all we will open the binomial on the log of the likelihood function:
 
@@ -259,13 +262,15 @@ Which is a continuous function. So making the substitution of the equation \ref{
 Then the maximum likelihood for n doesn't have a closed equation, similar to p. So we have the function.
 
 \begin{equation}
-  m\psi^{(0)}(\hat{n} + 1) - \sum_{i = 1} \psi^{(0)}(\hat{n} - x_i + 1) + mlog(1 - p) = 0
+  m\psi^{(0)}(\hat{n} + 1) - \sum_{i = 1} \psi^{(0)}(\hat{n} - x_i + 1) + mlog(1 - p) = 0 \label{lhn}
 \end{equation}
 
-```{r}
-# Estimar n => p Conhecido
+We will find the the root of equation \ref{lhn} using Newton-Raphson [\ref{nr}]. For this case we will make the estimation in three scenarios when the p is 0.15, 0.5 and 0.75, to check is there's no different behavior with is small, big or even in the point that maximize the variance of a binomial [$Var(X) = np(1-p)$].
 
-set.seed(18122021)
+```{r}
+# p = 0.15
+
+set.seed(1224015)
 p <- 0.15
 data <- rbinom(275, 17, p)
 m <- length(data)
@@ -273,9 +278,227 @@ media <- mean(data)
 
 frn <- function(x) m*psigamma((x+1),0) - sum(psigamma((x - data + 1))) + m*log(1-p)
 
-n_hat <- newton.raphson(frn,max(data),100) %>% 
+n_hat_1 <- newton.raphson(frn,max(data),100) %>% 
   quiet()
-n_hat$root_approximation
+```
+
+```{r}
+# p = 0.5
+
+set.seed(122405)
+p <- 0.5
+data <- rbinom(275, 17, p)
+m <- length(data)
+media <- mean(data)
+
+n_hat_2 <- newton.raphson(frn,max(data),100) %>% 
+  quiet()
+```
+
+```{r}
+# p = 0.75
+
+set.seed(1224075)
+p <- 0.75
+data <- rbinom(275, 17, p)
+m <- length(data)
+media <- mean(data)
+
+n_hat_3 <- newton.raphson(frn,max(data),100) %>% 
+  quiet()
+```
+
+The estimator of n is a continuous, but n is discrete, the estimation will be rounded. With p = 0.15 we had the n = `r n_hat_1$root_approximation %>% round(0)`, with p = 0.5 n = `r n_hat_2$root_approximation %>% round(0)` and with p = 0.75 n = `r n_hat_3$root_approximation %>% round(0)`.
+
+So we'll do the same process to diagnose the quality of the estimator as done before. In order to not insert an error into it, the number will not be rounded.
+
+
+```{r}
+param_n1 <- matrix(NA, ncol = 2, nrow = k); interact <- NA
+for (i in 1:k) {
+  set.seed(23122021-i)
+  
+  p <- 0.15
+  data <- rbinom(275, 17, p)
+  m <- length(data)
+  media <- mean(data)
+  
+  val <- newton.raphson(frn,max(data),100) %>% 
+    quiet()
+  interact[i] <- length(val$iterations)
+  param_n1[i,] <- cbind(i, val$root_approximation)
+}
+```
+
+```{r}
+upp_lim1 <- mean(param_n1[, 2]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(param_n1[, 2])
+low_lim1 <- mean(param_n1[, 2]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(param_n1[, 2])
+
+p1 <- param_n1[,2] %>%
+  round(4) %>%
+  as_tibble() %>%
+  mutate(ID = 1:length(value)) %>%
+  ggplot(aes(x = ID, y = value))+
+  geom_point()+
+  geom_hline(yintercept = 17, color = 'red', size = 1.5)+
+  geom_hline(
+    yintercept = low_lim1
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  geom_hline(
+    yintercept = upp_lim1
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  ggtitle("p = 0.05")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+```{r}
+param_n2 <- matrix(NA, ncol = 2, nrow = k); interact <- NA
+for (i in 1:k) {
+  set.seed(23122021-i)
+  
+  p <- 0.5
+  
+  data <- rbinom(n = 275, size = 17, prob = p)
+  m <- length(data)
+  media <- mean(data)
+  
+  val <- newton.raphson(frn,max(data),100) %>% 
+    quiet()
+  interact[i] <- length(val$iterations)
+  param_n2[i,] <- cbind(i, val$root_approximation)
+}
+param_n2[,2]
+```
+
+```{r}
+upp_lim2 <- mean(param_n2[, 2]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(param_n2[, 2])
+low_lim2 <- mean(param_n2[, 2]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(param_n2[, 2])
+
+p2 <- param_n2[,2] %>%
+  round(4) %>%
+  as_tibble() %>%
+  mutate(ID = 1:length(value)) %>%
+  ggplot(aes(x = ID, y = value))+
+  geom_point()+
+  geom_hline(yintercept = 17, color = 'red', size = 1.5)+
+  geom_hline(
+    yintercept = low_lim2
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  geom_hline(
+    yintercept = upp_lim2
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  ggtitle("p = 0.5")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+```{r}
+param_n3 <- matrix(NA, ncol = 2, nrow = k); interact <- NA
+for (i in 1:k) {
+  set.seed(23122021-i)
+  
+  data <- rbinom(275, 17, p)
+  m <- length(data)
+  media <- mean(data)
+  
+  val <- newton.raphson(frn,max(data),100) %>% 
+    quiet()
+  interact[i] <- length(val$iterations)
+  param_n3[i,] <- cbind(i, val$root_approximation)
+}
+```
+
+```{r}
+upp_lim3 <- mean(param_n3[, 2]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(param_n3[, 2])
+low_lim3 <- mean(param_n3[, 2]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(param_n3[, 2])
+
+p3 <- param_n3[,2] %>%
+  round(4) %>%
+  as_tibble() %>%
+  mutate(ID = 1:length(value)) %>%
+  ggplot(aes(x = ID, y = value))+
+  geom_point()+
+  geom_hline(yintercept = 17, color = 'red', size = 1.5)+
+  geom_hline(
+    yintercept = low_lim3
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  geom_hline(
+    yintercept = upp_lim3
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  ggtitle("p = 0.75")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r, include = T}
+p1+p2+p3
+```
+
+```{r}
+tab1 <- param_n1[,2] %>%
+  round(4) %>%
+  as_tibble() %>% 
+  mutate(
+    coverage = between(value, low_lim1, upp_lim1) %>% as.numeric()
+  ) %$% table(coverage) %>% 
+  prop.table() %>% 
+  as_tibble() %>% 
+  mutate(
+    coverage = c('error','hit')
+  )
+tab2 <- param_n2[,2] %>%
+  round(4) %>%
+  as_tibble() %>% 
+  mutate(
+    coverage = between(value, low_lim2, upp_lim2) %>% as.numeric()
+  ) %$% table(coverage) %>% 
+  prop.table() %>% 
+  as_tibble() %>% 
+  mutate(
+    coverage = c('error','hit')
+  )
+tab3 <- param_n3[,2] %>%
+  round(4) %>%
+  as_tibble() %>% 
+  mutate(
+    coverage = between(value, low_lim3, upp_lim3) %>% as.numeric()
+  ) %$% table(coverage) %>% 
+  prop.table() %>% 
+  as_tibble() %>% 
+  mutate(
+    coverage = c('error','hit')
+  )
+tab <- bind_cols(tab1,tab2$n,tab3$n) %>% 
+  magrittr::set_colnames(c('coverage','p_0.75','p_0.5','p_0.15'))
+```
+
+```{r, include = T}
+tab %>%
+  knitr::kable(booktabs = T) %>% 
+  kable_styling(latex_options = c("hold_position",'striped'))
 ```
 
 
