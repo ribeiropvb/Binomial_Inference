@@ -5,6 +5,7 @@ date: "2021-12-19 - Last changed in `r Sys.Date()`"
 header-includes:
    - \usepackage{amsmath}
    - \usepackage{amssymb}
+   - \usepackage{float}
    - \usepackage{bm}
 output: pdf_document
 editor_options: 
@@ -20,6 +21,8 @@ library(patchwork)
 knitr::opts_chunk$set(
   echo = F
   , include = F
+  , message = F
+  , warning = F
 )
 ```
 
@@ -30,17 +33,6 @@ data <- rbinom(275, 17, 0.75)
 k <- 10000
 m <- length(data)
 media <- mean(data)
-```
-
-```{r}
-vero <- function(x){
-  p <- x[1]
-  n <- x[2]
-  -(
-    m*log(gamma(n + 1)) - sum(log(gamma(n - data + 1))) - sum(log(gamma(data + 1)))+
-      m*media*log(p) + m*n*log(1 - p) - m*media*log(1 - p)
-  )
-}
 ```
 
 ```{r}
@@ -376,7 +368,6 @@ for (i in 1:k) {
   interact[i] <- length(val$iterations)
   param_n2[i,] <- cbind(i, val$root_approximation)
 }
-param_n2[,2]
 ```
 
 ```{r}
@@ -503,61 +494,450 @@ tab %>%
 
 So we since the coverage for all values of p, we can say that the estimator defined is the equation \ref{lhn} is a good estimator.
 
-## Both n and p unknow
+# Both n and p unknown
+
+For the case that we want to find both parameter, we have some options, but since both parameter don't have a closed equation for the parameters we'll probably fall into solving a system of equation. Which is very hard to solve computationally.
+
+But note that, the definition of the maximum estimator from the likelihood function, is to find a point that maximize that same function, so a easier way so solve it, would be computationally finding that point. That way of viewing the problem would also be possible for the past problems, but personally i find easier to solve those cases with using newton raphson in the derivative of the likelihood function.
+
+In this case it'll be used a function from R `optim()`, one thing to note is that the function find the minimum of the function , but unfurtunally there's no argument to find the maximum. So in order to find the maximum you can only define $-L(x;\theta)$.
 
 ```{r}
-# n e p desconhecidos
-## Maximizar verossimilhança
+vero <- function(x){
+  p <- x[1]
+  n <- x[2]
+    -(m*log(gamma(n + 1)) - sum(log(gamma(n - data + 1))) - sum(log(gamma(data + 1)))+
+      m*media*log(p) + m*n*log(1 - p) - m*media*log(1 - p))
+}
+```
 
-set.seed(18122021)
-data <- rbinom(275, 17, 0.75)
+How we are using a mainly computational way to maximize the likelihood function, and there's two unknown parameter, i'll be more generous with the interpretation of the results.
 
-m <- length(data)
-media <- mean(data)
+It'll be used, in the optim, the method `L-BFGS-B`, because is the multiparametric method that allow the definition of a minimum and a maximum for the possible parameter of the function, with is needed for p ($p \in (0,1)$), and for n, since any value greater than the maximum of the data will diverge.
 
-optim(
-  fn = vero
-  , par = c(0.01,(max(data)+1))
-  , lower = c(0.001,max(data))
-  , upper = c(0.999,100)
-  , method = 'L-BFGS-B'
-  , hessian = T
+```{r}
+# n e p unknown
+## Maximizing likelihood
+### p = 0.15
+
+val <- matrix(NA, ncol = 2, nrow = k)
+
+for (i in 1:k) {
+  set.seed(26122021-i)
+  data <- rbinom(275, 17, 0.15)
+  
+  m <- length(data)
+  media <- mean(data)
+  
+  val[i,] <- optim(
+    fn = vero
+    , par = c(0.01,(max(data)+1))
+    , lower = c(0.001,max(data))
+    , upper = c(0.999,100)
+    , method = 'L-BFGS-B'
+    , hessian = T
+  )$par
+}
+```
+
+In order to evaluate the numerical algorithm to find the max of the likelihood function, we will use 3 different scenarios, changing the value of p. We`ll use p = 0.15, p = 0.5 and p = 0.75. And then as done previously  we`ll plot the estimates of each loop made and then it`ll be shown a table compiling the coverage for the 3 cases (p = 0,15; p = 0.5; p = 0.75).
+
+```{r, include = T, out.height="45%"}
+upp_limp <- mean(val[, 1]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 1])
+low_limp <- mean(val[, 1]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 1])
+upp_limn <- mean(val[, 2]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 2])
+low_limn <- mean(val[, 2]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 2])
+
+p11 <- val[,1] %>%
+  round(4) %>%
+  as_tibble() %>%
+  mutate(ID = 1:length(value)) %>%
+  ggplot(aes(x = ID, y = value))+
+  geom_point()+
+  geom_hline(yintercept = 0.15, color = 'red', size = 1.5)+
+  geom_hline(
+    yintercept = low_limp
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  geom_hline(
+    yintercept = upp_limp
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  ggtitle("p = 0.15")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+p12 <- val[,2] %>%
+  round(4) %>%
+  as_tibble() %>%
+  mutate(ID = 1:length(value)) %>%
+  ggplot(aes(x = ID, y = value))+
+  geom_point()+
+  geom_hline(yintercept = 17, color = 'red', size = 1.5)+
+  geom_hline(
+    yintercept = low_limn
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  geom_hline(
+    yintercept = upp_limn
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  ggtitle("n = 17")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+p11+p12
+```
+
+```{r, include = T}
+tab1 <- bind_cols(
+  val[,1] %>%
+  round(4) %>%
+  as_tibble() %>% 
+  mutate(
+    coverage = between(value, low_limp, upp_limp) %>% as.numeric()
+  ) %$% table(coverage) %>% 
+  prop.table() %>% 
+  as_tibble() %>% 
+  mutate(
+    coverage = c('error','hit')
+  ),
+val[,2] %>%
+  round(4) %>%
+  as_tibble() %>% 
+  mutate(
+    coverage = between(value, low_limn, upp_limn) %>% as.numeric()
+  ) %$% table(coverage) %>% 
+  prop.table() %>% 
+  as_tibble() %>% 
+  mutate(
+    coverage = c('error','hit')
+  ) %>% .$n
+) %>% 
+  set_colnames(c('Coverage','p','n'))
+```
+
+
+
+```{r}
+# n e p unknown
+## Maximizing likelihood
+### p = 0.5
+
+val <- matrix(NA, ncol = 2, nrow = k)
+
+for (i in 1:k) {
+  set.seed(26122021-i)
+  data <- rbinom(275, 17, 0.5)
+  
+  m <- length(data)
+  media <- mean(data)
+  
+  val[i,] <- optim(
+    fn = vero
+    , par = c(0.01,(max(data)+1))
+    , lower = c(0.001,max(data))
+    , upper = c(0.999,100)
+    , method = 'L-BFGS-B'
+    , hessian = T
+  )$par
+}
+```
+
+```{r, include = T, out.height="45%"}
+upp_limp <- mean(val[, 1]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 1])
+low_limp <- mean(val[, 1]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 1])
+upp_limn <- mean(val[, 2]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 2])
+low_limn <- mean(val[, 2]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 2])
+
+p2 <- gridExtra::grid.arrange(
+  val[,1] %>%
+  round(4) %>%
+  as_tibble() %>%
+  mutate(ID = 1:length(value)) %>%
+  ggplot(aes(x = ID, y = value))+
+  geom_point()+
+  geom_hline(yintercept = 0.5, color = 'red', size = 1.5)+
+  geom_hline(
+    yintercept = low_limp
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  geom_hline(
+    yintercept = upp_limp
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  ggtitle("p = 0.5")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5)),
+val[,2] %>%
+  round(4) %>%
+  as_tibble() %>%
+  mutate(ID = 1:length(value)) %>%
+  ggplot(aes(x = ID, y = value))+
+  geom_point()+
+  geom_hline(yintercept = 17, color = 'red', size = 1.5)+
+  geom_hline(
+    yintercept = low_limn
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  geom_hline(
+    yintercept = upp_limn
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  ggtitle("n = 17")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5)),
+ncol = 2
 )
 ```
 
 ```{r}
-# param <- matrix(NA, ncol = 2, nrow = 10000)
-# for (i in 1:10000) {
-#   data <- rbinom(275, 17, 0.75)
-#   
-#   m <- length(data)
-#   media <- mean(data)
-#   
-#   val <- optim(
-#     fn = vero
-#     , par = c(0.01,(max(data)+1))
-#     , lower = c(0.001,max(data))
-#     , upper = c(0.999,100)
-#     , method = 'L-BFGS-B'
-#     , hessian = T
-#   )
-#   param[i,] <- val$par
-# }
-# 
-# param[,2] %>%
-#   as_tibble() %>% 
-#   mutate(ID = 1:length(value)) %>% 
-#   ggplot(aes(x = ID, y = value))+
-#   geom_point()+
-#   geom_hline(yintercept = 17, color = 'red')+
-#   theme_classic()
-# 
-# param[,1] %>%
-#   round(4) %>% 
-#   as_tibble() %>% 
-#   mutate(ID = 1:length(value)) %>% 
-#   ggplot(aes(x = ID, y = value))+
-#   geom_point()+
-#   geom_hline(yintercept = 0.75, color = 'red')+
-#   theme_classic()
+tab2 <- bind_cols(
+  val[,1] %>%
+  round(4) %>%
+  as_tibble() %>% 
+  mutate(
+    coverage = between(value, low_limp, upp_limp) %>% as.numeric()
+  ) %$% table(coverage) %>% 
+  prop.table() %>% 
+  as_tibble() %>% 
+  mutate(
+    coverage = c('error','hit')
+  ),
+val[,2] %>%
+  round(4) %>%
+  as_tibble() %>% 
+  mutate(
+    coverage = between(value, low_limn, upp_limn) %>% as.numeric()
+  ) %$% table(coverage) %>% 
+  prop.table() %>% 
+  as_tibble() %>% 
+  mutate(
+    coverage = c('error','hit')
+  ) %>% .$n
+) %>% 
+  set_colnames(c('Coverage','p','n'))
 ```
+
+
+
+```{r}
+# n e p unknown
+## Maximizing likelihood
+### p = 0.75
+
+val <- matrix(NA, ncol = 2, nrow = k)
+
+for (i in 1:k) {
+  set.seed(25122021-i)
+  data <- rbinom(275, 17, 0.75)
+  
+  m <- length(data)
+  media <- mean(data)
+  
+  val[i,] <- optim(
+    fn = vero
+    , par = c(0.01,(max(data)+1))
+    , lower = c(0.001,max(data))
+    , upper = c(0.999,100)
+    , method = 'L-BFGS-B'
+    , hessian = T
+  )$par
+}
+```
+
+```{r, inlude = T, out.height="45%"}
+upp_limp <- mean(val[, 1]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 1])
+low_limp <- mean(val[, 1]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 1])
+upp_limn <- mean(val[, 2]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 2])
+low_limn <- mean(val[, 2]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 2])
+
+p31 <- val[,1] %>%
+  round(4) %>%
+  as_tibble() %>%
+  mutate(ID = 1:length(value)) %>%
+  ggplot(aes(x = ID, y = value))+
+  geom_point()+
+  geom_hline(yintercept = 0.75, color = 'red', size = 1.5)+
+  geom_hline(
+    yintercept = low_limp
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  geom_hline(
+    yintercept = upp_limp
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  ggtitle("p = 0.75")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5))
+  
+p32 <- val[,2] %>%
+  round(4) %>%
+  as_tibble() %>%
+  mutate(ID = 1:length(value)) %>%
+  ggplot(aes(x = ID, y = value))+
+  geom_point()+
+  geom_hline(yintercept = 17, color = 'red', size = 1.5)+
+  geom_hline(
+    yintercept = low_limn
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  geom_hline(
+    yintercept = upp_limn
+    , color = 'blue'
+    , size = 1.5
+    , linetype = 'dashed'
+  )+
+  ggtitle("n = 17")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r, include = T, out.height="45%"}
+p31 + p32
+```
+
+
+```{r}
+tab3 <- bind_cols(
+  val[,1] %>%
+  round(4) %>%
+  as_tibble() %>% 
+  mutate(
+    coverage = between(value, low_limp, upp_limp) %>% as.numeric()
+  ) %$% table(coverage) %>% 
+  prop.table() %>% 
+  as_tibble() %>% 
+  mutate(
+    coverage = c('error','hit')
+  ),
+val[,2] %>%
+  round(4) %>%
+  as_tibble() %>% 
+  mutate(
+    coverage = between(value, low_limn, upp_limn) %>% as.numeric()
+  ) %$% table(coverage) %>% 
+  prop.table() %>% 
+  as_tibble() %>% 
+  mutate(
+    coverage = c('error','hit')
+  ) %>% .$n
+) %>% 
+  set_colnames(c('Coverage','p','n'))
+```
+
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\hline
+True values      & Situation & p      & n      \\ \hline
+p = 0.15; n = 17 & error     & 0.339  & 0.0558 \\
+p = 0.15; n = 17 & hit       & 0.966  & 0.944  \\ \hline
+p = 0.5; n = 17  & error     & 0.0524 & 0.0488 \\
+p = 0.5; n = 17  & hit       & 0.948  & 0.951  \\ \hline
+p = 0.75; n = 17 & error     & 0.0766 & 0.0877 \\
+p = 0.75; n = 17 & hit       & 0.923  & 0.912  \\ \hline
+\end{tabular}
+\end{table}
+
+```{r, include = T}
+# n e p unknown
+## Maximizing likelihood
+### p = 0.75
+
+k <- 500
+val <- matrix(NA, ncol = 2, nrow = k)
+p_vec <- seq(0.05,0.95, length.out = 90)
+lista <- list(NULL)
+
+for (j in 1:length(p_vec)) {
+  for (i in 1:k) {
+    set.seed(25122021-i)
+    data <- rbinom(275, 17, p_vec[j])
+    
+    m <- length(data)
+    media <- mean(data)
+    
+    val[i,] <- optim(
+      fn = vero
+      , par = c(0.01,(max(data)+1))
+      , lower = c(0.001,max(data))
+      , upper = c(0.999,100)
+      , method = 'L-BFGS-B'
+      , hessian = T
+    )$par
+  }
+  lista[[j]] <- val
+}
+
+lista <- do.call("rbind", lista) %>%
+  as_tibble() %>% 
+  magrittr::set_colnames(c('p','n')) %>% 
+  mutate(
+    modelo = rep(1:90,k) %>% sort()
+  ) %>% 
+  dplyr::select(modelo,everything())
+
+
+upp_limn <- mean(val[, 2]) + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 2])
+low_limn <- mean(val[, 2]) - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd(val[, 2])
+
+conf_int <- lista %>% group_by(modelo) %>% 
+  summarise(
+    media_p = mean(p),
+    media_n = mean(n),
+    sd_p = sd(p),
+    sd_n = sd(n)
+  ) %>% mutate(
+    low_limp = media_p - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd_p,
+    upp_limp = media_p + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd_p,
+    low_limn = media_n - qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd_n,
+    upp_limn = media_n + qnorm(0.95 + (1 - 0.95) / 2, 0, 1) * sd_n
+  )
+
+data <- inner_join(lista, conf_int, by = 'modelo') %>% 
+  dplyr::select(modelo,
+    low_limp,p,upp_limp,
+    low_limn,n,upp_limn
+  ) %>% mutate(
+    covarege_p = ifelse(p >= low_limp & p <= upp_limp, 1, 0),
+    covarege_n = ifelse(n >= low_limn & n <= upp_limn, 1, 0)
+  )
+data %>%
+  group_by(modelo,covarege_p) %>% 
+  summarise(
+    val = n()/k
+  ) %>% filter(covarege_p == 1) %>% 
+  select(modelo,val) %>% 
+  ggplot(aes(x = modelo/90, y = val))+
+  geom_point()+
+  geom_line()
+```
+
+```{r}
+
+```
+
