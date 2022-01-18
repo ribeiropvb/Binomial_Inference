@@ -848,6 +848,7 @@ val[,2] %>%
   set_colnames(c('Coverage','p','n'))
 ```
 
+As we can see in the plot shown, the amount of points outside the confidence interval, is bigger for 0.5 than 0.15 and 0.75 is bigger than 0.5. Which wasn't expected, since 0.5 is the point that maximize the variance [$Var(X) = np(1-p)$].
 
 \begin{table}[H]
 \centering
@@ -862,6 +863,10 @@ p = 0.75; n = 17 & error     & 0.0766 & 0.0877 \\
 p = 0.75; n = 17 & hit       & 0.923  & 0.912  \\ \hline
 \end{tabular}
 \end{table}
+
+With the table we can see that the estimation shown good results for p = 0.15 and p = 0.5, but the results wasn't that great for p = 0.75 (p = 0.923; n = 0.912), but as said previously we'll be more lenient with the multiparametric case. So we'll consider the estimation good for p = 0,15 and p = 0.5 and regular for p = 0.75.
+
+But an interesting might be on your mind, how the covarege perform in different values of p? So we'll see it for 90 different on the range of 0.05 and 0.95, with the code `seq(0.05,0.95, length.out = 90)`. I'll leave to the reader to do the same type of analysis for diffent values of n
 
 ```{r, include = T}
 # n e p unknown
@@ -934,8 +939,31 @@ data %>%
   select(modelo,val) %>% 
   ggplot(aes(x = modelo/90, y = val))+
   geom_point()+
-  geom_line()
+  geom_line()+
+  xlab('Cobertura do parâmetro p')+
+data %>%
+  group_by(modelo,covarege_n) %>% 
+  summarise(
+    val = n()/k
+  ) %>% filter(covarege_n == 1) %>% 
+  select(modelo,val) %>% 
+  ggplot(aes(x = modelo/90, y = val))+
+  geom_point()+
+  geom_line()+
+  xlab('Cobertura do parâmetro n')
 ```
+
+So we have a very interesting result here:
+
+- Where we have a covarage between [0.95; 0.97] for $p \in [0.25;0.75]$, for both parameter
+
+- For $p < 0.25$ the covarage, for p, have a positive spike and, for n, have a negative spike.
+
+- For $p \in [0.70; 0.80]$ a big reduction on both parameter;
+
+- For $p > 0.8$ a covarage between [0.95; 0.97] for p, and a perfect or nearly perfect covarege for n.
+
+# Conclusion
 
 ```{r}
 
