@@ -965,7 +965,4 @@ So we have a very interesting result here:
 
 # Conclusion
 
-```{r}
-
-```
-
+By using the classic inference paradigm we had a good form to take the inference for the parameters on each case presented, remarking the points argued for the biparametric case.
