@@ -940,7 +940,7 @@ data %>%
   ggplot(aes(x = modelo/90, y = val))+
   geom_point()+
   geom_line()+
-  xlab('Cobertura do parâmetro p')+
+  xlab('Coverage of the parameter p')+
 data %>%
   group_by(modelo,covarege_n) %>% 
   summarise(
@@ -950,7 +950,7 @@ data %>%
   ggplot(aes(x = modelo/90, y = val))+
   geom_point()+
   geom_line()+
-  xlab('Cobertura do parâmetro n')
+  xlab('Coverage of the parameter n')
 ```
 
 So we have a very interesting result here:
